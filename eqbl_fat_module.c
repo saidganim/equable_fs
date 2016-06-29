@@ -25,7 +25,7 @@
 
 
 
-MODULE_AUTHOR("Saidgani Musaev <saidgani.musaev@gmail.com>");
+MODULE_AUTHOR("Saidgani Musaev <cpu808694@gmail.com>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Equable fs, based on fat32");
 
