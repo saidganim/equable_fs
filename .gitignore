@@ -1,0 +1,6 @@
+*.ko
+*.o
+dir
+image
+*.ko.cmd
+*.o.cmd
