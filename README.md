@@ -6,5 +6,5 @@ For install this FS you need:
 # sudo insmod equable_fat_module.ko
 # sudo mount -o loop -t eqbl_fs image dir
 //=======================================
-sudo umount dir
-sudo rmmod equable_fat_module
+# sudo umount dir
+# sudo rmmod equable_fat_module
