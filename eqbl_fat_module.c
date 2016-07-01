@@ -4,7 +4,6 @@
  * The main idea of this project is using block device evenly for making data storage more sustainable.
  */
 
-
 #include <linux/mutex.h>
 #include <linux/string.h>
 #include <linux/list.h>
@@ -23,12 +22,9 @@
 #include <asm/uaccess.h>
 #include "eqbl_fat.h"
 
-
-
 MODULE_AUTHOR("Saidgani Musaev <cpu808694@gmail.com>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Equable fs, based on fat32");
-
 
 short int RECORD_COUNT = 0;
 unsigned int VALID_FAT[2];
@@ -39,7 +35,6 @@ DEFINE_MUTEX(efat_inode_mutex);
 
 uint64_t INODE_NUMBER = ROOT_INODE_NUMBER + 1;
 
-
 struct eqbl_file_alloc_table{
     unsigned int data[FAT_SIZE - sizeof( char )];
     char flag;
@@ -49,10 +44,6 @@ struct free_block{
   struct list_head list;
   unsigned int number;
 };
-
-
-
-
 
 struct efat_inode {
     uint64_t first_cluster; // position in fat
@@ -66,31 +57,23 @@ struct efat_file_record{
     char data[64];
 };
 
-
-
 struct __eqbl_fat_super_block{
     uint64_t magic;
 };
-
 
 struct eqbl_fat_super_block{
     struct eqbl_file_alloc_table fat[EQBL_FAT_ARRAY_SIZE];
     struct __eqbl_file_super_block* __efat_sb;
 };
 
-
-
 struct free_block* free_block_list_head;
 
 static unsigned int efat_inode_count = 0;
-
-
 
 //BDEV_OPERATIONS
 inline unsigned int get_free_block( void );
 inline int efat_read_cluster(struct super_block *sb, char* buffer, unsigned int number);
 inline int efat_write_cluster(struct super_block *sb, char* buffer, unsigned int number);
-
 
 // DIR_OPERATIONS
 int efat_dir_open(struct inode *inode, struct file *file);
@@ -112,7 +95,6 @@ ssize_t efat_read(struct file * filp, char __user * buf, size_t len,
 ssize_t efat_write(struct file * filp, const char __user * buf, size_t len,
                loff_t * ppos);
 
-
 int efat_mknod( struct inode* dir, struct dentry* dentry, umode_t, dev_t dev);
 
 int efat_create( struct inode *dir, struct dentry *dentry, umode_t mode, bool excl);
@@ -122,7 +104,6 @@ struct efat_inode* efat_get_same_inode(struct super_block* , struct inode*);
 const struct inode_operations eqbl_fat_inode_operations;
 const struct file_operations eqbl_dir_operations;
 const struct file_operations eqbl_file_operations;
-
 
 int sync_efat_inode(struct super_block* sb, struct efat_inode* efat_sync){
     char* buff;
@@ -135,7 +116,6 @@ int sync_efat_inode(struct super_block* sb, struct efat_inode* efat_sync){
         efat_read_cluster(sb, buff, i);
         efat_i = (struct efat_inode*) buff;
         for(j = 0; j < CLUSTER_SIZE / sizeof(struct efat_inode); ++j){
-            printk( KERN_ALERT " inode is located in root directory::: dentry name: <%s>  first_cluster = %d\n", efat_sync->name, efat_sync->first_cluster);
             if(efat_sync->first_cluster == efat_i->first_cluster) { // Found the inode record
                 memcpy(efat_i, efat_sync, sizeof(struct efat_inode));
                 efat_write_cluster(sb, buff, i);
@@ -149,9 +129,9 @@ int sync_efat_inode(struct super_block* sb, struct efat_inode* efat_sync){
     return -ENOENT;
 }
 
-void sync_fat(struct super_block *sb){
+int sync_fat(struct super_block *sb){
     char* buff;
-    unsigned int i, j;
+    unsigned int i;
     struct eqbl_fat_super_block* efat_sb;
     efat_sb = (struct eqbl_fat_super_block*)sb->s_fs_info;
 
@@ -162,11 +142,9 @@ void sync_fat(struct super_block *sb){
         if(unlikely(0 != efat_write_cluster(sb, buff , i)))
            return -EBUSY;
     }
-
     kfree(buff);
+    return 0;
 }
-
-
 
 int efat_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 {
@@ -180,9 +158,8 @@ int efat_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentr
 	return 0;
 }
 
-
 struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned int flags){
-    struct inode *inode_root = NULL,  *inode;
+    struct inode *inode;
     char *buff;
     struct efat_inode *efat_i;
     int i, j;
@@ -235,10 +212,9 @@ int efat_unlink(struct inode *dir, struct dentry *dentry)
 	return 0;
 }
 
-int efat_rmdir(struct inode *dir, struct dentry *dentry)
-{
+int efat_rmdir(struct inode *dir, struct dentry *dentry){
 	if (!simple_empty(dentry))
-	return -ENOTEMPTY;
+	   return -ENOTEMPTY;
 	 
 	drop_nlink(d_inode(dentry));
 	efat_unlink(dir, dentry);
@@ -251,24 +227,22 @@ int efat_rename(struct inode *old_dir, struct dentry *old_dentry,
 struct inode *new_dir, struct dentry *new_dentry){
 	struct inode *inode = d_inode(old_dentry);
 	int they_are_dirs = d_is_dir(old_dentry);
-
 	if (!simple_empty(new_dentry))
-	return -ENOTEMPTY;
+	   return -ENOTEMPTY;
 
 	if (d_really_is_positive(new_dentry)) {
-	efat_unlink(new_dir, new_dentry);
-	if (they_are_dirs) {
-	drop_nlink(d_inode(new_dentry));
-	drop_nlink(old_dir);
-	}
+    	efat_unlink(new_dir, new_dentry);
+    	if (they_are_dirs) {
+        	drop_nlink(d_inode(new_dentry));
+        	drop_nlink(old_dir);
+    	}
 	} else if (they_are_dirs) {
-	drop_nlink(old_dir);
-	inc_nlink(new_dir);
+	   drop_nlink(old_dir);
+	   inc_nlink(new_dir);
 	}
 	 
 	old_dir->i_ctime = old_dir->i_mtime = new_dir->i_ctime =
 	new_dir->i_mtime = inode->i_ctime = CURRENT_TIME;
-
 	return 0;
 }
 
@@ -279,9 +253,10 @@ ssize_t efat_read(struct file * filp, char __user * buf, size_t len,
     size_t begin_len;
     char __user * ptr;
     unsigned int i, first_cluster, cluster_no, cluster_off;
+    loff_t shift;
     struct eqbl_fat_super_block* efat_sb;
     efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;
-    loff_t shift;
+   
     if( (*ppos) > filp->f_inode->i_size)
         return 0;
     len = min( len , filp->f_inode->i_size - *ppos);
@@ -313,8 +288,6 @@ ssize_t efat_read(struct file * filp, char __user * buf, size_t len,
     return begin_len - len;
 };
 
-
-
 ssize_t efat_write(struct file * filp, const char __user * buf, size_t len,
                loff_t * ppos){
     struct efat_inode *efat_i =(struct efat_inode*) filp->f_inode->i_private;
@@ -323,11 +296,11 @@ ssize_t efat_write(struct file * filp, const char __user * buf, size_t len,
     unsigned int i;
     size_t begin_len;
     unsigned int first_cluster, cluster_no, cluster_off;
-    struct eqbl_fat_super_block* efat_sb;
-    efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;
     loff_t shift;
-    begin_len = len;
-   
+    struct eqbl_fat_super_block* efat_sb;
+  
+    efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;
+    begin_len = len; 
     buffer = (char*) kmalloc(CLUSTER_SIZE, GFP_KERNEL);
     first_cluster = *ppos / CLUSTER_SIZE;
     cluster_off = *ppos - CLUSTER_SIZE * first_cluster;
@@ -366,7 +339,6 @@ ssize_t efat_write(struct file * filp, const char __user * buf, size_t len,
     return begin_len - len;
 };
 
-
 int efat_dir_open(struct inode *inode, struct file *file){
     static struct qstr cursor_name = QSTR_INIT(".", 1);
     struct efat_inode* efat_i;
@@ -376,14 +348,10 @@ int efat_dir_open(struct inode *inode, struct file *file){
     return file->private_data ? 0 : -ENOMEM;
 }
 
-
 int efat_dir_close(struct inode *inode, struct file *file){
     dput(file->private_data);
-
     return 0;
 }
-
-
 
 int efat_readdir(struct file *filp, struct dir_context *ctx){
     loff_t pos;
@@ -393,9 +361,7 @@ int efat_readdir(struct file *filp, struct dir_context *ctx){
     struct efat_inode *efat_i, *tmp_i;
     unsigned int i, record_no;
     struct eqbl_fat_super_block* efat_sb;
-    efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;
-    
-    //spin_lock(&dentry->d_lock);
+    efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;    
     pos = ctx->pos;
     if (pos) {
         /* FIXME: We use a hack of reading pos to figure if we have filled in all data.
@@ -409,7 +375,7 @@ int efat_readdir(struct file *filp, struct dir_context *ctx){
     efat_i = (struct efat_inode*)inode->i_private;
     if(unlikely(! efat_i->file_flags && 0b01000000))
         return -ENOTDIR;
-    record_no = efat_i->first_cluster; //fat[0].data[efat_i->first_cluster];
+    record_no = efat_i->first_cluster;
     do {
         if(record_no == -1) break;
         efat_read_cluster(sb, buff, EFAT_INODESTORE_CLUSTER_NUMBER + record_no * sizeof(struct efat_inode) / CLUSTER_SIZE);
@@ -421,34 +387,17 @@ int efat_readdir(struct file *filp, struct dir_context *ctx){
     } while(efat_sb->fat[0].data[record_no] != 0 && efat_sb->fat[0].data[record_no] != -1);
 
     kfree(buff);
-    //spin_unlock(&dentry->d_lock);
     return 0;
 }
 
-
 const struct file_operations eqbl_dir_operations ={
-    // .open           = efat_dir_open,
-    // .release        = efat_dir_close,
-    // .llseek         = dcache_dir_lseek,
-    // .read           = generic_read_dir,
     .iterate        = efat_readdir,
-    // .fsync          = noop_fsync,
-    
-
 };
-
 
 const struct file_operations eqbl_file_operations = {
      .read        = efat_read,
-    // .aio_read   = generic_file_aio_read,
      .write      = efat_write,
      .open       = efat_dir_open,
-    // .aio_write  = generic_file_aio_write,
-    // .mmap       = generic_file_mmap,
-    // .fsync      = noop_fsync,
-    // .splice_read    = generic_file_splice_read,
-    // .splice_write   = generic_file_splice_write,
-    // .llseek     = generic_file_llseek,
 };
 
 const struct inode_operations eqbl_fat_inode_operations = {
@@ -471,16 +420,11 @@ const struct super_operations eqbl_fat_super_operations = {
     .put_super = eqbl_fat_put_super
 };
 
+static struct kmem_cache *efat_inode_cachep; // TODO: the kmem_cache is unused. Need to Fix it (Kernel cache for inodes) 
 
 
 
-
-
-static struct kmem_cache *efat_inode_cachep; // Kernel cache for inodes
-
-
-
-
+// TODO: While using sb_bread 2.4 kernel bdev mechanism. But in coming time need to change mechanism to bio struct
 // Reading one cluster
 inline int efat_read_cluster(struct super_block *sb, char* buffer, unsigned int number){
     unsigned int block_count, i;
@@ -499,7 +443,6 @@ inline int efat_read_cluster(struct super_block *sb, char* buffer, unsigned int 
     };
     return 0;
 };
-
 
 // Writing one cluster
 inline int efat_write_cluster(struct super_block *sb, char* buffer, unsigned int number){
@@ -526,7 +469,6 @@ inline int efat_write_cluster(struct super_block *sb, char* buffer, unsigned int
     return 0;
 };
 
-
 // Getting free block in FAT
 inline unsigned int get_free_block( void ){
 	struct free_block* free_b;
@@ -541,23 +483,12 @@ inline unsigned int get_free_block( void ){
 	return res;
 };
 
-
-
-
-
-
-
 // INODE_OPERATIONS
-
-
 /**
  * This function creates inode , sets pointer to inode_operations struct,
  * Monitors is inode creates for directory or for regular file.
  *  
  */
-
-
-
 int efat_mknod( struct inode* dir, struct dentry *dentry, umode_t umode, dev_t dev){
     char *buffer;
     unsigned int cluster_no, cluster_off, i, last_cluster;
@@ -581,7 +512,6 @@ int efat_mknod( struct inode* dir, struct dentry *dentry, umode_t umode, dev_t d
     {
         efat_i->first_cluster = efat_inode_count + 2;
     }
-        
 
     efat_i->size = 0;
     efat_sb->fat[0].data[efat_i->first_cluster] = -1;
@@ -596,11 +526,7 @@ int efat_mknod( struct inode* dir, struct dentry *dentry, umode_t umode, dev_t d
             last_cluster = i;
         if(i == -1 || i == 0)
             break;
-    }
-    
-    // last_cluster = fat[0].data[i]; 
-    // fat[0].data[i] = efat_inode_count + 1; 
-    // fat[0].data[fat[0].data[i]] = last_cluster;
+    }    
     efat_sb->fat[0].data[last_cluster] = efat_inode_count; 
     efat_sb->fat[0].data[efat_sb->fat[0].data[last_cluster]] = -1;
     efat_sb->fat[0].data[efat_inode_count + 1] = -1;
@@ -617,26 +543,18 @@ int efat_mknod( struct inode* dir, struct dentry *dentry, umode_t umode, dev_t d
     return err;
 } 
 
-
 int efat_create( struct inode *dir, struct dentry *dentry, umode_t mode, bool excl){
     return efat_mknod(dir, dentry, mode | S_IFREG, 0);    
 };
 
-int efat_mkdir(struct inode * dir, struct dentry * dentry, umode_t mode)
-{
+int efat_mkdir(struct inode * dir, struct dentry * dentry, umode_t mode){
     int retval = efat_mknod(dir, dentry, mode | S_IFDIR, 0);
     if (!retval)
         inc_nlink(dir);
     return retval;
 }
 
-
-
-
-
-
 // SUPER_BLOCK
-
 void eqbl_fat_put_super(struct super_block *sb){ 		// Function which is called during umounting fs
     struct free_block* tmp;
     struct list_head *q, *pos;
@@ -654,28 +572,6 @@ void destroy_efat_inode(struct inode *inode){
     kmem_cache_free(efat_inode_cachep, efat_inode);
 };
 
-
-
-
-
-
-
-
-//DEPRECATED
-// static struct efat_inode* efat_get_root_inode(struct super_block *sb){
-//     struct eqbl_fat_super_block* efat_sb;
-//     uint64_t offset;
-//     struct buffer_head* bh;
-//     struct efat_inode* res;
-//     efat_sb = (struct eqbl_fat_super_block*)sb->s_fs_info;
-//     offset = EQBL_FAT_ARRAY_SIZE * FAT_SIZE + 2; // Location of sector, containing root inode on disk
-//     bh = sb_bread(sb, offset);
-//     BUG_ON(!bh);
-//     res = (struct efat_inode*) bh->b_data;
-//     brelse(bh);
-//     return res;
-// }
-
 enum {
     Opt_mode,
     Opt_err
@@ -686,20 +582,16 @@ static const match_table_t tokens = {
     {Opt_err, NULL}
 };
 
-static umode_t efat_parse_options(char *data)
-{
+static umode_t efat_parse_options(char *data){
     substring_t args[MAX_OPT_ARGS];
     int option;
     int token;
     char *p;
     umode_t umode;
-
     umode = EFAT_DEFAULT_MODE;
-
     while ((p = strsep(&data, ",")) != NULL) {
         if (!*p)
             continue;
-
         token = match_token(p, tokens, args);
         switch (token) {
         case Opt_mode:
@@ -709,7 +601,6 @@ static umode_t efat_parse_options(char *data)
             break;
         }
     }
-
     return umode;
 }
 
@@ -768,7 +659,6 @@ struct efat_inode* efat_get_same_inode(struct super_block* sb, struct inode* ino
 struct inode* eqbl_fat_get_inode(struct super_block* sb, 
     const struct  inode* dir, struct dentry* dentry, umode_t mode){
     struct inode* inode;
-    unsigned int cluster_no;
     struct efat_inode *efat_i;
     inode = new_inode(sb);
     if(unlikely(!inode))
@@ -790,7 +680,6 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
             inode->i_op = &eqbl_fat_inode_operations;
             inode->i_fop = &eqbl_file_operations;
             efat_i->file_flags = 0b00000000;
-            
             break;
         case S_IFDIR:
             inode->i_op = &eqbl_fat_inode_operations;
@@ -803,37 +692,26 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
             inode->i_op = &page_symlink_inode_operations;
             break;
         }
-        // cluster_no = 0;
-        // if(dir){
-        //     cluster_no = ((struct efat_inode*)dir->i_private)->first_cluster;
-        //     while(fat[0].data[cluster_no] != 0  && fat[0].data[cluster_no] != -1){
-        //         cluster_no = fat[0].data[cluster_no];
-        //     }
-        // }
-        // fat[0].data[cluster_no] = efat_inode_count + 1;
-        // fat[0].data[fat[0].data[cluster_no]] = -1;
         inode->i_private = efat_i;
         return inode;
 }
 
-
 static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
-    struct inode *inode_root = NULL, *tmp_inode, **marked_inode;
+    struct inode *inode_root = NULL;
     struct eqbl_file_alloc_table *buffer_fat;
-    char* linked_inodes;
   //  struct request_queue *blk_queue = NULL;
     struct eqbl_fat_super_block *efat_sb;
-    struct __eqbl_fat_super_block *__efat_sb;
+    struct __eqbl_fat_super_block* __efat_sb;
     struct free_block* fr_block;
-    char *buff, *store;
+    char *buff;
     char *cluster_bufer;
     umode_t umode;
-    struct efat_inode *efat_i, *tmp_efat_i;
-    int i, j, fat_ptr, ret = 0;
+    struct efat_inode *efat_i;
+    int i, j, ret = 0;
     buff = (char*)kmalloc(CLUSTER_SIZE, GFP_KERNEL);
     efat_read_cluster(sb, buff, EQBL_FAT_SUPER_BLOCK_OFFSET);
     efat_inode_count = 0;
-    __efat_sb = ( struct eqbl_fat_super_block* )buff;
+    __efat_sb = ( struct __eqbl_fat_super_block* )buff;
     efat_sb = (struct eqbl_fat_super_block*)kmalloc(sizeof(struct eqbl_fat_super_block), GFP_KERNEL);
     if(unlikely(__efat_sb->magic != EQBL_FAT_MAGIC_NUMBER)){
         printk( KERN_ALERT "EQBL_FAT_FS_ERR: The magic number on device doesn't match magic number of FS...\n");
@@ -841,7 +719,6 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
         cluster_bufer = (char*)kmalloc(CLUSTER_SIZE, GFP_KERNEL);
         memcpy(cluster_bufer, __efat_sb, sizeof(struct efat_inode));
         efat_write_cluster(sb, cluster_bufer, EQBL_FAT_SUPER_BLOCK_OFFSET);
-
        // ret = -EACCES;
         //goto release;
     }
@@ -849,13 +726,8 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     sb->s_magic = EQBL_FAT_MAGIC_NUMBER;
 
     sb->s_fs_info = efat_sb;
-    //sb->s_maxbytes = MAX_FILE_SIZE;
-
     sb->s_maxbytes      = MAX_LFS_FILESIZE;
-    //sb->s_blocksize     = 512;
-    //sb->s_blocksize_bits    = PAGE_CACHE_SHIFT;
-
-    sb->s_op = &eqbl_fat_super_operations; 		  // This field should be set in the future
+    sb->s_op = &eqbl_fat_super_operations;
     inode_root = eqbl_fat_get_inode(sb, NULL, NULL, S_IFDIR);
     umode = efat_parse_options(data);
     if(unlikely(!umode))
@@ -868,11 +740,8 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     if( !sb->s_root ){
 	    return -ENOMEM;
     }
-
     // reading fat table
     for( i = EQBL_FAT_ARRAY_OFFSET; i <= EQBL_FAT_ARRAY_SIZE  * sizeof(struct eqbl_file_alloc_table) / CLUSTER_SIZE; i += 1 ){
-      // Reading clusters step by step and putting data into array of fat structures  
-	  // printk( KERN_ALERT "EQBL_FAT_FS_ERR: READING FAT: %d cluster is being read...\n", i);
        if(unlikely(0 != efat_read_cluster(sb, buff , i)))
             return -EBUSY;
 	   buffer_fat =  (struct eqbl_file_alloc_table*) buff;
@@ -882,7 +751,6 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     
     VALID_FAT[0] = 0;
     VALID_FAT[1] = 1;
-    VALID_FAT[2] = 2;
     j = 0;
     for( i = 0; i < EQBL_FAT_ARRAY_SIZE; i += 1){
       if(efat_sb->fat[i].flag || 0b10000000 ){
@@ -922,90 +790,23 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     	fr_block->number = i;
     	list_add(&fr_block->list, &free_block_list_head->list);
           }
-     
     }
-
-    //READING INODE_STORE
 
      for(i = EFAT_INODESTORE_CLUSTER_NUMBER ; i < EFAT_INODESTORE_CLUSTER_NUMBER +  EFAT_INODESTORE_CLUSTER_COUNT; ++i){
         efat_read_cluster(sb, buff, i);
         efat_i = (struct efat_inode*) buff;
         for(j = 0; j < CLUSTER_SIZE / sizeof(struct efat_inode); ++j){
             if(efat_i->first_cluster == 0 )
-                goto end_of_inodestore;
+                goto release;
             ++efat_inode_count;
             ++efat_i;
         }
     }
 
-    end_of_inodestore:
-//     marked_inode = (struct efat_inode**) kmalloc(EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode), GFP_KERNEL);
-//     memset(marked_inode, NULL , EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode));
-//     linked_inodes = (char*) kmalloc(EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode), GFP_KERNEL);
-//     memset(linked_inodes,0, EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode));
-//     store = (char*)kmalloc(CLUSTER_SIZE, GFP_KERNEL);
-//     for(i = EFAT_INODESTORE_CLUSTER_NUMBER ; i < EFAT_INODESTORE_CLUSTER_NUMBER +  EFAT_INODESTORE_CLUSTER_COUNT; ++i){
-//         efat_read_cluster(sb, buff, i);
-//         efat_i = (struct efat_inode*) buff;
-//         for(j = 0; j < CLUSTER_SIZE / sizeof(struct efat_inode); ++j){
-//             printk( KERN_ALERT " inode is located in some directory::: first_cluster = %d\n", efat_i->first_cluster);
-//             if(efat_i->first_cluster == 0 || efat_i->first_cluster == -1)
-//             goto reading_root;
-//             if(efat_i->file_flags && 0b01000000){ // Directory is found
-//                 if(!marked_inode[efat_i->first_cluster]) {// Inode is not allocated in memory
-//                     marked_inode[efat_i->first_cluster] = new_inode(sb);
-//                     marked_inode[efat_i->first_cluster]->i_private = kmalloc(sizeof(struct efat_inode), GFP_KERNEL);
-//                     memcpy(marked_inode[efat_i->first_cluster]->i_private, efat_i, sizeof(struct efat_inode));
-//                 }
-//                 fat_ptr = efat_i->first_cluster;
-//                 while(fat_ptr > 0){
-//                     efat_read_cluster(sb, store, EFAT_INODESTORE_CLUSTER_NUMBER + efat_i->first_cluster  / (CLUSTER_SIZE / sizeof(struct efat_inode)) );
-//                     tmp_efat_i = store[efat_i->first_cluster % (CLUSTER_SIZE / sizeof(struct efat_inode))];
-//                     //if(tmp_efat_i && 0b01000000){
-//                         //marked_inode[tmp_efat_i->first_cluster] = kmalloc(sizeof(struct inode), GFP_KERNEL);
-//                         //memcpy(marked_inode[tmp_efat_i->first_cluster],tmp_efat_i, sizeof(struct efat_inode));
-//                     //}
-//                     if(!marked_inode[tmp_efat_i->first_cluster]) {// Child inode is located in root directory
-//                         marked_inode[tmp_efat_i->first_cluster] = new_inode(sb);
-//                         marked_inode[tmp_efat_i->first_cluster]->i_private = kmalloc(sizeof(struct efat_inode), GFP_KERNEL);
-//                         memcpy(marked_inode[tmp_efat_i->first_cluster]->i_private, tmp_efat_i, sizeof(struct efat_inode));
-//                     }
-//                     inode_init_owner(marked_inode[efat_i->first_cluster], efat_i, (tmp_efat_i->file_flags && 0b01000000? S_IFDIR : S_IFREG) | umode);
-//                     linked_inodes[tmp_efat_i->first_cluster] = 1;
-//                     fat_ptr = fat[0].data[fat_ptr];
-//                 }
-//             } else {
-//                 if(!marked_inode[efat_i->first_cluster]) // Inode is not allocated in memory
-//                     marked_inode[efat_i->first_cluster] = new_inode(sb);
-//                     marked_inode[efat_i->first_cluster]->i_private = kmalloc(sizeof(struct efat_inode), GFP_KERNEL);
-//                     memcpy(marked_inode[efat_i->first_cluster]->i_private, efat_i, sizeof(struct efat_inode));
-//             }
-//             ++efat_i;
-//         }
-//     }
-// reading_root:
-//     for(i = EFAT_INODESTORE_CLUSTER_NUMBER ; i < EFAT_INODESTORE_CLUSTER_NUMBER +  EFAT_INODESTORE_CLUSTER_COUNT; ++i){
-//         efat_read_cluster(sb, buff, i);
-//         efat_i = (struct efat_inode*) buff;
-//         for(j = 0; j < CLUSTER_SIZE / sizeof(struct efat_inode); ++j){
-//             printk( KERN_ALERT " inode is located in root directory::: first_cluster = %d\n", efat_i->first_cluster);
-//             if(efat_i->first_cluster == 0 || efat_i->first_cluster == -1)
-//             goto release;
-//             if(!linked_inodes[efat_i->first_cluster]) {// Inode is not linked with parent
-//                 dentry =
-//                 inode_init_owner(marked_inode[efat_i->first_cluster], inode_root, (efat_i->file_flags && 0b01000000? S_IFDIR : S_IFREG) | umode);
-//                 ++efat_inode_count;
-//             }
-//             ++efat_i;
-//         }
-//     }
-
 release:
     kfree(buff);
-    kfree(store);
     return ret;
 }
-
 
 static struct dentry *eqbl_fat_mount( struct file_system_type *fs_type_struct, int flags, const char* dev_name,  void *data){
 	return mount_bdev(fs_type_struct, flags, dev_name, data, eqbl_fat_fill_sb);
@@ -1033,7 +834,6 @@ static int __init eqbl_fat_registrating( void ){
     
 	return register_filesystem( &eqbl_fat_struct ); // registrating the filesystem in the kernel
 }
-
 
 static void __exit eqbl_fat_releasing ( void ){
     kmem_cache_destroy(efat_inode_cachep);
