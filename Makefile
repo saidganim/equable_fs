@@ -6,7 +6,7 @@ TARGET = eqbl_fat_module
 obj-m := $(TARGET).o
 
 
-all:
+build:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 clean:
