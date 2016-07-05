@@ -3,7 +3,7 @@ Light-weight file system for Linux
 
 For install this FS you need:
 # make
-# sudo insmod equable_fat_module.ko
+# sudo insmod efat.ko
 # sudo mount -o loop -t eqbl_fs image dir
 //=======================================
 # sudo umount dir
