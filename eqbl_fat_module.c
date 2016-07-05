@@ -35,37 +35,6 @@ DEFINE_MUTEX(efat_inode_mutex);
 
 uint64_t INODE_NUMBER = ROOT_INODE_NUMBER + 1;
 
-struct eqbl_file_alloc_table{
-    unsigned int data[FAT_SIZE - sizeof( char )];
-    char flag;
-};
-
-struct free_block{
-  struct list_head list;
-  unsigned int number;
-};
-
-struct efat_inode {
-    uint64_t first_cluster; // position in fat
-    uint64_t i_ino;
-    loff_t size;
-    char file_flags; // flags for file [<deleted>,<directory>,<>,<>,<>,<>,<>,<>]
-    char name[64 - sizeof(char) - sizeof(uint64_t) - sizeof(uint64_t) - sizeof(loff_t)];
-};
-
-struct efat_file_record{
-    char data[64];
-};
-
-struct __eqbl_fat_super_block{
-    uint64_t magic;
-};
-
-struct eqbl_fat_super_block{
-    struct eqbl_file_alloc_table fat[EQBL_FAT_ARRAY_SIZE];
-    struct __eqbl_file_super_block* __efat_sb;
-};
-
 struct free_block* free_block_list_head;
 
 static unsigned int efat_inode_count = 0;
