@@ -1,9 +1,11 @@
 CURRENT = $(shell uname -r)
 KDIR =  /lib/modules/$(CURRENT)/build
 PWD = $(shell pwd)
-TARGET = eqbl_fat_module
+TARGET = efat
 
 obj-m := $(TARGET).o
+
+$(TARGET)-objs := eqbl_fat_module.o eqbl_fat.o  
 
 
 build:

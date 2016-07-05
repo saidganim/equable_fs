@@ -2,7 +2,8 @@
 #define EQBL_FAT_FS
 
 
-
+#include <linux/list.h>
+#include <linux/fs.h>
 
 
 
@@ -81,5 +82,23 @@ struct eqbl_fat_super_block{
     struct eqbl_file_alloc_table fat[EQBL_FAT_ARRAY_SIZE];
     struct __eqbl_file_super_block* __efat_sb;
 };
+
+
+unsigned int get_free_block( void );
+
+// Low-latency bdev read/write functions  
+inline int efat_read_cluster(struct super_block *sb, char* buffer, unsigned int number);
+inline int efat_write_cluster(struct super_block *sb, char* buffer, unsigned int number);
+
+
+
+
+
+
+
+
+
+
+
 
 #endif
