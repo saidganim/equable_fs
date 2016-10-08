@@ -50,7 +50,7 @@
 #define EFAT_INODESTORE_CLUSTER_NUMBER 65
 #define EFAT_INODESTORE_CLUSTER_COUNT 4
 
-
+#define KERN_LOG(str) printk( KERN_ALERT str)
 
 struct eqbl_file_alloc_table{
     unsigned int data[FAT_SIZE - sizeof( char )];
