@@ -80,7 +80,7 @@ struct __eqbl_fat_super_block{
 
 struct eqbl_fat_super_block{
     struct eqbl_file_alloc_table fat[EQBL_FAT_ARRAY_SIZE];
-    struct __eqbl_file_super_block* __efat_sb;
+    struct __eqbl_fat_super_block* __efat_sb;
 };
 
 
