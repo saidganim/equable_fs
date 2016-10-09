@@ -629,6 +629,7 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
 
 static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     struct inode *inode_root = NULL;
+    struct eqbl_file_alloc_table *buffer_fat;
   //  struct request_queue *blk_queue = NULL;
     struct eqbl_fat_super_block *efat_sb;
     struct __eqbl_fat_super_block* __efat_sb;
@@ -672,12 +673,13 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
 	    return -ENOMEM;
     }
     // reading fat table
-    for( i = EQBL_FAT_ARRAY_OFFSET; i <= EQBL_FAT_ARRAY_OFFSET + EQBL_FAT_ARRAY_SIZE  * sizeof(struct eqbl_file_alloc_table) / CLUSTER_SIZE; i += 1 ){
-	if(unlikely(0 != efat_read_cluster(sb, buff , i)))
-		return -EBUSY;
-	memcpy(efat_sb->fat + CLUSTER_SIZE * (i - EQBL_FAT_ARRAY_OFFSET) , buff, CLUSTER_SIZE);
+    for( i = EQBL_FAT_ARRAY_OFFSET; i <= EQBL_FAT_ARRAY_SIZE  * sizeof(struct eqbl_file_alloc_table) / CLUSTER_SIZE; i += 1 ){
+       if(unlikely(0 != efat_read_cluster(sb, buff , i)))
+            return -EBUSY;
+	   buffer_fat =  (struct eqbl_file_alloc_table*) buff;
+	   for( j = 0 ; j < CLUSTER_SIZE / sizeof(struct eqbl_file_alloc_table); j += 1)
+	       efat_sb->fat[CLUSTER_SIZE / sizeof(struct eqbl_file_alloc_table) * (i - EQBL_FAT_ARRAY_OFFSET) + j] = buffer_fat[j];
     }
-    
     VALID_FAT[0] = 0;
     VALID_FAT[1] = 1;
     j = 0;
