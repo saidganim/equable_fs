@@ -26,6 +26,8 @@ MODULE_AUTHOR("Saidgani Musaev <cpu808694@gmail.com>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Equable fs, based on fat32");
 
+static struct kmem_cache *efat_inode_cachep; // TODO: the kmem_cache is unused. Need to Fix it (Kernel cache for inodes) 
+
 short int RECORD_COUNT = 0;
 unsigned int VALID_FAT[2];
 
@@ -100,6 +102,7 @@ int sync_efat_inode(struct super_block* sb, struct efat_inode* efat_sync){
 
 int sync_fat(struct super_block *sb){
     char* buff;
+    int res = 0;
     unsigned int i;
     struct eqbl_fat_super_block* efat_sb;
     efat_sb = (struct eqbl_fat_super_block*)sb->s_fs_info;
@@ -108,11 +111,14 @@ int sync_fat(struct super_block *sb){
     for( i = EQBL_FAT_ARRAY_OFFSET; i <= EQBL_FAT_ARRAY_SIZE  * sizeof(struct eqbl_file_alloc_table) / CLUSTER_SIZE; i += 1 ){
      // Reading clusters step by step and putting data into array of fat structures  
         memcpy(buff, &efat_sb->fat[i - EQBL_FAT_ARRAY_OFFSET], CLUSTER_SIZE);
-        if(unlikely(0 != efat_write_cluster(sb, buff , i)))
-           return -EBUSY;
+        if(unlikely(0 != efat_write_cluster(sb, buff , i))){
+           res = -EBUSY;
+	   goto sync_fat_release;
+	}
     }
+sync_fat_release:
     kfree(buff);
-    return 0;
+    return res;
 }
 
 int efat_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
@@ -150,7 +156,8 @@ struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned 
                     inode_init_owner(inode, parent, S_IFREG);
                     inode->i_fop = &eqbl_file_operations;
                  }
-                inode->i_private = kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+
+                inode->i_private = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
                 memcpy(inode->i_private, efat_i, sizeof(struct efat_inode));
                 d_add(child, inode);
                 goto release;
@@ -172,9 +179,9 @@ release:
 int efat_unlink(struct inode *dir, struct dentry *dentry)
 {
 
-	//TODO: The same situation as a efat_link function
+	//TODO: Realizations just in memory. Immediately fix it!
 	struct inode *inode = d_inode(dentry);
-	 
+	kmem_cache_free(efat_inode_cachep, inode->i_private); 
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME; 
 	drop_nlink(inode);
 	dput(dentry);
@@ -328,9 +335,9 @@ int efat_readdir(struct file *filp, struct dir_context *ctx){
     struct super_block *sb;
     char* buff;
     struct efat_inode *efat_i, *tmp_i;
-    unsigned int i, record_no;
+    unsigned int record_no;
     struct eqbl_fat_super_block* efat_sb;
-    efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;    
+    
     pos = ctx->pos;
     if (pos) {
         /* FIXME: We use a hack of reading pos to figure if we have filled in all data.
@@ -338,11 +345,14 @@ int efat_readdir(struct file *filp, struct dir_context *ctx){
          * use the tokens correctly to not fill too many data in each cursor based call */
         return 0;
     }
-    buff = (char*) kmalloc(CLUSTER_SIZE, GFP_KERNEL);
+    
+    efat_sb = (struct eqbl_fat_super_block*)filp->f_inode->i_sb->s_fs_info;
     inode = filp->f_inode;
     sb = inode->i_sb;
+    buff = (char*) kmalloc(CLUSTER_SIZE, GFP_KERNEL);
     efat_i = (struct efat_inode*)inode->i_private;
-    if(unlikely(! efat_i->file_flags && 0b01000000))
+    
+    if(unlikely(! efat_i->file_flags && 0b01000000)) // inode isn't a directory
         return -ENOTDIR;
     record_no = efat_i->first_cluster;
     do {
@@ -351,7 +361,6 @@ int efat_readdir(struct file *filp, struct dir_context *ctx){
         tmp_i = (struct efat_inode*) (buff + record_no * sizeof(struct efat_inode) % CLUSTER_SIZE);
         dir_emit(ctx, tmp_i->name, strlen(tmp_i->name) , inode->i_ino, DT_UNKNOWN);
         ctx->pos += sizeof(struct efat_inode);
-        pos += sizeof(struct efat_inode);
         record_no = efat_sb->fat[0].data[record_no];
     } while(efat_sb->fat[0].data[record_no] != 0 && efat_sb->fat[0].data[record_no] != -1);
 
@@ -388,11 +397,6 @@ const struct super_operations eqbl_fat_super_operations = {
     .destroy_inode = destroy_efat_inode,
     .put_super = eqbl_fat_put_super
 };
-
-static struct kmem_cache *efat_inode_cachep; // TODO: the kmem_cache is unused. Need to Fix it (Kernel cache for inodes) 
-
-
-
 
 
 // Getting free block in FAT
@@ -532,9 +536,14 @@ static umode_t efat_parse_options(char *data){
 
 struct efat_inode* eqb_fat_read_inode(struct super_block* sb, unsigned int i_ino){
     struct efat_inode* e_inode;
-    char buffer[EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode)];
+    char *buffer;
     int i, j;
+<<<<<<< HEAD
     struct efat_inode* res = (struct efat_inode* ) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+=======
+    struct efat_inode* res = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+    buffer = (char*) kmalloc(EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode), GFP_KERNEL);
+>>>>>>> 1e7e1d92a8cfd8ad4b6fa5b786fe53201991f89c
     mutex_lock_interruptible(&efat_inode_mutex);
     for( i = 0 ; i < EFAT_INODESTORE_CLUSTER_COUNT; ++i){
         efat_read_cluster(sb, buffer, EFAT_INODESTORE_CLUSTER_NUMBER);
@@ -556,9 +565,14 @@ struct efat_inode* eqb_fat_read_inode(struct super_block* sb, unsigned int i_ino
 
 struct efat_inode* efat_get_same_inode(struct super_block* sb, struct inode* inode){
     struct efat_inode *original, *e_inode;
-    char buffer[EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode)];
+    char *buffer;
     int i, j;
+<<<<<<< HEAD
     struct efat_inode* res = (struct efat_inode* )  kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+=======
+    struct efat_inode* res = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+    buffer = kmalloc(EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode), GFP_KERNEL);
+>>>>>>> 1e7e1d92a8cfd8ad4b6fa5b786fe53201991f89c
     original = (struct efat_inode*) inode->i_private;
     mutex_lock_interruptible(&efat_inode_mutex);
     for( i = 0 ; i < EFAT_INODESTORE_CLUSTER_COUNT; ++i){
@@ -591,7 +605,11 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
         return inode;
     inode_init_owner(inode, dir, mode);
     inode->i_atime =  inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+<<<<<<< HEAD
     efat_i = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL); // kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+=======
+    efat_i = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+>>>>>>> 1e7e1d92a8cfd8ad4b6fa5b786fe53201991f89c
     memset(efat_i, 0 , sizeof(struct efat_inode));
     inode->i_ino = get_next_ino();
     efat_i->i_ino = inode->i_ino;
@@ -638,8 +656,9 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     efat_inode_count = 0;
     __efat_sb = ( struct __eqbl_fat_super_block* )buff;
     efat_sb = (struct eqbl_fat_super_block*)kmalloc(sizeof(struct eqbl_fat_super_block), GFP_KERNEL);
+    memset(efat_sb, 0, CLUSTER_SIZE);
     if(unlikely(__efat_sb->magic != EQBL_FAT_MAGIC_NUMBER)){
-        printk( KERN_ALERT "EQBL_FAT_FS_ERR: The magic number on device doesn't match magic number of FS...\n");
+        KERN_LOG("EQBL_FAT_FS_ERR: The magic number on device doesn't match magic number of FS...\n");
         __efat_sb->magic = EQBL_FAT_MAGIC_NUMBER;
         cluster_bufer = (char*)kmalloc(CLUSTER_SIZE, GFP_KERNEL);
         memcpy(cluster_bufer, __efat_sb, sizeof(struct efat_inode));
@@ -674,7 +693,6 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
 	   for( j = 0 ; j < CLUSTER_SIZE / sizeof(struct eqbl_file_alloc_table); j += 1)
 	       efat_sb->fat[CLUSTER_SIZE / sizeof(struct eqbl_file_alloc_table) * (i - EQBL_FAT_ARRAY_OFFSET) + j] = buffer_fat[j];
     }
-    
     VALID_FAT[0] = 0;
     VALID_FAT[1] = 1;
     j = 0;
@@ -743,6 +761,7 @@ static int __init eqbl_fat_registrating( void ){
                                          (SLAB_RECLAIM_ACCOUNT| SLAB_MEM_SPREAD),
                                          NULL);
     if(unlikely(!efat_inode_cachep)){
+	KERN_LOG("EFAT: Couldn't Allocate memory for slab cache\n");
         return -ENOMEM;
     }
     
