@@ -150,7 +150,7 @@ struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned 
                     inode_init_owner(inode, parent, S_IFREG);
                     inode->i_fop = &eqbl_file_operations;
                  }
-                inode->i_private = kmalloc(sizeof(struct efat_inode), GFP_KERNEL);
+                inode->i_private = kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
                 memcpy(inode->i_private, efat_i, sizeof(struct efat_inode));
                 d_add(child, inode);
                 goto release;
@@ -534,7 +534,7 @@ struct efat_inode* eqb_fat_read_inode(struct super_block* sb, unsigned int i_ino
     struct efat_inode* e_inode;
     char buffer[EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode)];
     int i, j;
-    struct efat_inode* res = (struct efat_inode* ) kmalloc(sizeof(struct efat_inode), GFP_KERNEL);
+    struct efat_inode* res = (struct efat_inode* ) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
     mutex_lock_interruptible(&efat_inode_mutex);
     for( i = 0 ; i < EFAT_INODESTORE_CLUSTER_COUNT; ++i){
         efat_read_cluster(sb, buffer, EFAT_INODESTORE_CLUSTER_NUMBER);
@@ -558,7 +558,7 @@ struct efat_inode* efat_get_same_inode(struct super_block* sb, struct inode* ino
     struct efat_inode *original, *e_inode;
     char buffer[EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode)];
     int i, j;
-    struct efat_inode* res = (struct efat_inode* ) kmalloc(sizeof(struct efat_inode), GFP_KERNEL);
+    struct efat_inode* res = (struct efat_inode* )  kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
     original = (struct efat_inode*) inode->i_private;
     mutex_lock_interruptible(&efat_inode_mutex);
     for( i = 0 ; i < EFAT_INODESTORE_CLUSTER_COUNT; ++i){
@@ -591,7 +591,7 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
         return inode;
     inode_init_owner(inode, dir, mode);
     inode->i_atime =  inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-    efat_i = (struct efat_inode*)kmalloc(sizeof(struct efat_inode),GFP_KERNEL); // kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+    efat_i = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL); // kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
     memset(efat_i, 0 , sizeof(struct efat_inode));
     inode->i_ino = get_next_ino();
     efat_i->i_ino = inode->i_ino;
@@ -623,9 +623,8 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
 }
 
 static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
-    struct inode *inode_root = NULL;
+    struct inode *inode_root = NULL; //root node of mounted dir
     struct eqbl_file_alloc_table *buffer_fat;
-  //  struct request_queue *blk_queue = NULL;
     struct eqbl_fat_super_block *efat_sb;
     struct __eqbl_fat_super_block* __efat_sb;
     struct free_block* fr_block;
@@ -666,6 +665,7 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     if( !sb->s_root ){
 	    return -ENOMEM;
     }
+
     // reading fat table
     for( i = EQBL_FAT_ARRAY_OFFSET; i <= EQBL_FAT_ARRAY_SIZE  * sizeof(struct eqbl_file_alloc_table) / CLUSTER_SIZE; i += 1 ){
        if(unlikely(0 != efat_read_cluster(sb, buff , i)))
@@ -695,18 +695,6 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
     INIT_LIST_HEAD(&free_block_list_head->list);
     free_block_list_head->number = -1;
     for( i = 0 ; i < FAT_SIZE - sizeof( char ); i += 1){
-      
-      // Block of code, which checks fat tables to be equal with each other
-      // If they don't, it will do something like voting function
- //      if(unlikely( fat[VALID_FAT[0]].data[i] != fat[VALID_FAT[1]].data[i] ||
-	// 	   fat[VALID_FAT[0]].data[i] != fat[VALID_FAT[2]].data[i] ||
-	// 	   fat[VALID_FAT[1]].data[i] != fat[VALID_FAT[2]].data[i]
-	// 	 )
-	// ) 
-	// fat[VALID_FAT[0]].data[i] = fat[VALID_FAT[1]].data[i] = fat[VALID_FAT[2]].data[i] =
-	// fat[VALID_FAT[0]].data[i] && fat[VALID_FAT[1]].data[i] || 
-	// fat[VALID_FAT[0]].data[i] && fat[VALID_FAT[2]].data[i] || 
-	// fat[VALID_FAT[1]].data[i] && fat[VALID_FAT[2]].data[i];
     if(efat_sb->fat[0].data[i] == 0 && i > 256){ // Filling double linked list of free blocks
     	fr_block = (struct free_block*)kmalloc( sizeof(struct free_block), GFP_KERNEL);
         if(!fr_block){
