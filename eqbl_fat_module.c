@@ -538,12 +538,8 @@ struct efat_inode* eqb_fat_read_inode(struct super_block* sb, unsigned int i_ino
     struct efat_inode* e_inode;
     char *buffer;
     int i, j;
-<<<<<<< HEAD
-    struct efat_inode* res = (struct efat_inode* ) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
-=======
     struct efat_inode* res = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
     buffer = (char*) kmalloc(EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode), GFP_KERNEL);
->>>>>>> 1e7e1d92a8cfd8ad4b6fa5b786fe53201991f89c
     mutex_lock_interruptible(&efat_inode_mutex);
     for( i = 0 ; i < EFAT_INODESTORE_CLUSTER_COUNT; ++i){
         efat_read_cluster(sb, buffer, EFAT_INODESTORE_CLUSTER_NUMBER);
@@ -567,12 +563,8 @@ struct efat_inode* efat_get_same_inode(struct super_block* sb, struct inode* ino
     struct efat_inode *original, *e_inode;
     char *buffer;
     int i, j;
-<<<<<<< HEAD
-    struct efat_inode* res = (struct efat_inode* )  kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
-=======
     struct efat_inode* res = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
     buffer = kmalloc(EFAT_INODESTORE_CLUSTER_COUNT * CLUSTER_SIZE / sizeof(struct efat_inode), GFP_KERNEL);
->>>>>>> 1e7e1d92a8cfd8ad4b6fa5b786fe53201991f89c
     original = (struct efat_inode*) inode->i_private;
     mutex_lock_interruptible(&efat_inode_mutex);
     for( i = 0 ; i < EFAT_INODESTORE_CLUSTER_COUNT; ++i){
@@ -605,11 +597,7 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
         return inode;
     inode_init_owner(inode, dir, mode);
     inode->i_atime =  inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-<<<<<<< HEAD
     efat_i = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL); // kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
-=======
-    efat_i = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
->>>>>>> 1e7e1d92a8cfd8ad4b6fa5b786fe53201991f89c
     memset(efat_i, 0 , sizeof(struct efat_inode));
     inode->i_ino = get_next_ino();
     efat_i->i_ino = inode->i_ino;
