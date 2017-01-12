@@ -62,7 +62,7 @@ struct free_block{
   unsigned int number;
 };
 
-struct efat_inode {
+struct efat_inode { // exact size of strut is 64 bytes;
     uint64_t first_cluster; // position in fat
     uint64_t i_ino;
     loff_t size;

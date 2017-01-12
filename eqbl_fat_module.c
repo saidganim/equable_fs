@@ -136,10 +136,48 @@ int efat_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentr
 struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned int flags){
     struct inode *inode;
     char *buff;
-    struct efat_inode *efat_i;
+    struct efat_inode *efat_i, *efat_parent;
     int i, j;
+    unsigned int record_no;
+    struct eqbl_fat_super_block* efat_sb;
+    efat_sb = (struct eqbl_fat_super_block*)parent->i_sb->s_fs_info;
     buff = (char*)kmalloc(CLUSTER_SIZE, GFP_KERNEL);
-    for(i = EFAT_INODESTORE_CLUSTER_NUMBER ; i < EFAT_INODESTORE_CLUSTER_NUMBER +  EFAT_INODESTORE_CLUSTER_COUNT; ++i){
+    efat_parent = parent->i_private;
+
+    record_no = efat_parent->first_cluster;
+    do {
+        if(record_no == -1) break;
+        efat_read_cluster(parent->i_sb, buff, EFAT_INODESTORE_CLUSTER_NUMBER + record_no * sizeof(struct efat_inode) / CLUSTER_SIZE);
+        efat_i = (struct efat_inode*) (buff + record_no * sizeof(struct efat_inode) % CLUSTER_SIZE);
+        if(!strcmp(efat_i->name, child->d_name.name)){
+            inode =  new_inode(parent->i_sb);
+            inode->i_ino = get_next_ino();
+            inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+            inode->i_op = &eqbl_fat_inode_operations;
+            if(efat_i->file_flags && 0b01000000){
+                inode_init_owner(inode, parent, S_IFDIR);
+                inode->i_fop = &eqbl_dir_operations;
+            }
+            else{
+                inode_init_owner(inode, parent, S_IFREG);
+                inode->i_fop = &eqbl_file_operations;
+             }
+
+            inode->i_private = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
+            memcpy(inode->i_private, efat_i, sizeof(struct efat_inode));
+            d_add(child, inode);
+            goto release;
+        }
+        record_no = efat_sb->fat[0].data[record_no];
+        if(efat_i->first_cluster == 0)
+                break;
+    } while(efat_sb->fat[0].data[record_no] != 0 && efat_sb->fat[0].data[record_no] != -1);
+
+
+
+
+
+    /*for(i = EFAT_INODESTORE_CLUSTER_NUMBER ; i < EFAT_INODESTORE_CLUSTER_NUMBER +  EFAT_INODESTORE_CLUSTER_COUNT; ++i){
         efat_read_cluster(parent->i_sb, buff, i);
         efat_i = (struct efat_inode*) buff;
         for(j = 0; j < CLUSTER_SIZE / sizeof(struct efat_inode); ++j){
@@ -162,11 +200,12 @@ struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned 
                 d_add(child, inode);
                 goto release;
             }
-            if(efat_i->first_cluster == 0)
-                break;
+            
             ++efat_i;
         }
-    }
+    }*/
+
+
     d_add(child, NULL);
     kfree(buff);
     return NULL;
@@ -605,9 +644,6 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
     if(dentry)
         memcpy(efat_i->name, dentry->d_name.name, strlen(dentry->d_name.name));
     switch (mode & S_IFMT) {
-        default:
-            init_special_inode(inode, mode, 0);
-            break;
         case S_IFREG:
             inode->i_op = &eqbl_fat_inode_operations;
             inode->i_fop = &eqbl_file_operations;
@@ -622,6 +658,9 @@ struct inode* eqbl_fat_get_inode(struct super_block* sb,
             break;
         case S_IFLNK:
             inode->i_op = &page_symlink_inode_operations;
+            break;
+        default:
+            init_special_inode(inode, mode, 0);
             break;
         }
         inode->i_private = efat_i;
