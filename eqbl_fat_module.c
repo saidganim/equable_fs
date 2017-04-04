@@ -137,7 +137,6 @@ struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned 
     struct inode *inode;
     char *buff;
     struct efat_inode *efat_i, *efat_parent;
-    int i, j;
     unsigned int record_no;
     struct eqbl_fat_super_block* efat_sb;
     efat_sb = (struct eqbl_fat_super_block*)parent->i_sb->s_fs_info;
@@ -172,39 +171,6 @@ struct dentry* efat_lookup(struct inode* parent, struct dentry* child, unsigned 
         if(efat_i->first_cluster == 0)
                 break;
     } while(efat_sb->fat[0].data[record_no] != 0 && efat_sb->fat[0].data[record_no] != -1);
-
-
-
-
-
-    /*for(i = EFAT_INODESTORE_CLUSTER_NUMBER ; i < EFAT_INODESTORE_CLUSTER_NUMBER +  EFAT_INODESTORE_CLUSTER_COUNT; ++i){
-        efat_read_cluster(parent->i_sb, buff, i);
-        efat_i = (struct efat_inode*) buff;
-        for(j = 0; j < CLUSTER_SIZE / sizeof(struct efat_inode); ++j){
-            if(!strcmp(efat_i->name, child->d_name.name) ){
-                inode =  new_inode(parent->i_sb);
-                inode->i_ino = get_next_ino();
-                inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-                inode->i_op = &eqbl_fat_inode_operations;
-                if(efat_i->file_flags && 0b01000000){
-                    inode_init_owner(inode, parent, S_IFDIR);
-                    inode->i_fop = &eqbl_dir_operations;
-                }
-                else{
-                    inode_init_owner(inode, parent, S_IFREG);
-                    inode->i_fop = &eqbl_file_operations;
-                 }
-
-                inode->i_private = (struct efat_inode*) kmem_cache_alloc(efat_inode_cachep, GFP_KERNEL);
-                memcpy(inode->i_private, efat_i, sizeof(struct efat_inode));
-                d_add(child, inode);
-                goto release;
-            }
-            
-            ++efat_i;
-        }
-    }*/
-
 
     d_add(child, NULL);
     kfree(buff);
@@ -261,8 +227,8 @@ struct inode *new_dir, struct dentry *new_dentry){
 	return 0;
 }
 
-ssize_t efat_read(struct file * filp, char __user * buf, size_t len,
-              loff_t * ppos){
+ssize_t efat_read(struct file *filp, char __user *buf, size_t len,
+              loff_t *ppos){
     struct efat_inode *inode =(struct efat_inode*) filp->f_inode->i_private;
     char* buffer;
     size_t begin_len;
@@ -303,8 +269,8 @@ ssize_t efat_read(struct file * filp, char __user * buf, size_t len,
     return begin_len - len;
 };
 
-ssize_t efat_write(struct file * filp, const char __user * buf, size_t len,
-               loff_t * ppos){
+ssize_t efat_write(struct file *filp, const char __user *buf, size_t len,
+               loff_t *ppos){
     struct efat_inode *efat_i =(struct efat_inode*) filp->f_inode->i_private;
     char* buffer;
     char __user * ptr;
