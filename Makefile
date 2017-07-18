@@ -5,8 +5,7 @@ TARGET = efat
 
 obj-m := $(TARGET).o
 
-$(TARGET)-objs := eqbl_fat_module.o eqbl_fat.o  
-
+$(TARGET)-objs := eqbl_fat_module.o eqbl_fat.o
 
 build:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
