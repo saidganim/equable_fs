@@ -522,27 +522,27 @@ static const match_table_t tokens = {
 								{Opt_err, NULL}
 };
 
-static umode_t efat_parse_options(char *data){
-								substring_t args[MAX_OPT_ARGS];
-								int option;
-								int token;
-								char *p;
-								umode_t umode;
-								umode = EFAT_DEFAULT_MODE;
-								while ((p = strsep(&data, ",")) != NULL) {
-																if (!*p)
-																								continue;
-																token = match_token(p, tokens, args);
-																switch (token) {
-																case Opt_mode:
-																								if (match_octal(&args[0], &option))
-																																return NULL;
-																								umode = option & S_IALLUGO;
-																								break;
-																}
-								}
-								return umode;
-}
+// static umode_t efat_parse_options(char *data){
+// 								substring_t args[MAX_OPT_ARGS];
+// 								int option;
+// 								int token;
+// 								char *p;
+// 								umode_t umode;
+// 								umode = EFAT_DEFAULT_MODE;
+// 								while ((p = strsep(&data, ",")) != NULL) {
+// 																if (!*p)
+// 																								continue;
+// 																token = match_token(p, tokens, args);
+// 																switch (token) {
+// 																case Opt_mode:
+// 																								if (match_octal(&args[0], &option))
+// 																																return NULL;
+// 																								umode = option & S_IALLUGO;
+// 																								break;
+// 																}
+// 								}
+// 								return umode;
+// }
 
 struct efat_inode* eqb_fat_read_inode(struct super_block* sb, unsigned int i_ino){
 								struct efat_inode* e_inode;
@@ -646,7 +646,6 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
 								struct free_block* fr_block;
 								char *buff;
 								char *cluster_bufer;
-								umode_t umode;
 								struct efat_inode *efat_i;
 								int i, j, ret = 0;
 								buff = (char*)kmalloc(CLUSTER_SIZE, GFP_KERNEL);
@@ -672,10 +671,7 @@ static int eqbl_fat_fill_sb( struct super_block* sb, void* data, int silent){
 								sb->s_maxbytes = MAX_LFS_FILESIZE;
 								sb->s_op = &eqbl_fat_super_operations;
 								inode_root = eqbl_fat_get_inode(sb, NULL, NULL, S_IFDIR);
-								umode = efat_parse_options(data);
-								if(unlikely(!umode))
-																return -EINVAL;
-								inode_init_owner( inode_root, NULL, S_IFDIR | umode );
+								inode_init_owner( inode_root, NULL, S_IFDIR);
 								sb->s_root = d_make_root( inode_root );
 								memcpy(((struct efat_inode*)inode_root->i_private)->name, sb->s_root->d_name.name, strlen(sb->s_root->d_name.name));
 								((struct efat_inode*)(inode_root->i_private))->first_cluster = 0; // Because this is a root directory
